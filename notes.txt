@@ -1,0 +1,1209 @@
+ def learning_loop():
+    class ActionQueue:
+        def __init__(self, size=1000):
+            self.size = size
+            self.queue = []
+
+        def enqeue(self, action_memory):
+            if len(self.queue) > self.size:
+                self.queue.pop()
+                self.queue.insert(0, action_memory)
+            else:
+                self.queue.insert(0, action_memory)
+        
+        def clear(self):
+            self.queue = []
+
+        def push_to_buffer_and_learn(self, agent, actor, tf, feedback_value, interval_min=0, interval_max=.8):
+            if len(self.queue) == 0: return None
+            else:
+                avg_loss = []
+                i = 0
+                for action_memory in self.queue:
+                    b = tf-action_memory[2]
+                    a = tf - action_memory[3]
+                    # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
+                    pushed = (b >= interval_min and a <= interval_max)
+                    if pushed:
+                        agent.remember(action_memory[8], action_memory[1], feedback_value, action_memory[0], action_memory[9])
+                    i += 1
+                return np.mean(np.array(avg_loss))
+
+    def get_env_params(env):
+        obs = env.reset()
+        # close the environment
+        params = {'obs': obs['observation'].shape[0],
+                'goal': obs['desired_goal'].shape[0],
+                'goal2': obs['desired_goal2'].shape[0],
+                'goal3': obs['desired_goal3'].shape[0],
+                'goal4': obs['desired_goal4'].shape[0],
+                'action': env.action_space.shape[0],
+                'action_max': env.action_space.high[0],
+                }
+        # params['max_timesteps'] = env._max_episode_steps
+        params['max_timesteps'] = 400
+        return params
+
+    def preproc_inputs(env_params, obs, g, g2, g3, g4):
+        o_norm = normalizer(size=env_params['obs'])
+        g_norm = normalizer(size=env_params['goal'])
+        g2_norm = normalizer(size=env_params['goal2'])
+        g3_norm = normalizer(size=env_params['goal3'])
+        g4_norm = normalizer(size=env_params['goal4'])
+        obs_norm =  o_norm.normalize(obs)
+        g_norm = g_norm.normalize(g)
+        g2_norm = g2_norm.normalize(g2)
+        g3_norm = g3_norm.normalize(g3)
+        g4_norm = g4_norm.normalize(g4)
+        # concatenate the stuffs
+        inputs = np.concatenate([obs_norm, g_norm, g2_norm, g3_norm, g4_norm])
+        inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0)
+        return inputs
+
+
+    env = gym.make('FetchPush-v1')
+    sim = env.sim  # to change camera angle
+
+    env_params = get_env_params(env)
+    env._max_episode_steps = 100
+
+    # Note: these credit assignment intervals impact how the agent behaves a lot.
+    # Because of this sensitivity the model is overall very sensitive.
+    # There is a frame time delay of .1 so teaching is not boring. Could make the 
+    # the agent much better if played at around 10 frames per second (not sure of  current fps)
+    interval_min = .2
+    interval_max = .8
+
+    episodes=2000
+    USE_CUDA = torch.cuda.is_available()
+    learning_rate = .001
+    replay_buffer_size = 100000
+    learn_buffer_interval = 200  # interval to learn from replay memory
+    batch_size = 200
+    print_interval = 1000
+    log_interval = 1000
+    learning_start = 100
+    win_break = True
+    queue_size = 2000
+
+    n_actions = 2
+    max_action = 1
+
+    observation_space_shape = np.array([37])
+
+    agent = Agent(input_dims=observation_space_shape, env=env,  # learns from feedback
+                n_actions=n_actions)
+
+    actor = Agent(input_dims=observation_space_shape, env=env,  # learns from env
+                n_actions=n_actions)
+
+    frame = env.reset()
+
+
+    episode_rewards = []
+    all_rewards = []
+    sum_rewards=[]
+    losses = []
+    episode_num = 0
+    is_win = False
+
+    stopwatch = SW.Stopwatch()
+
+    cnt=0
+    start_f=0
+    end_f=0
+
+    action_queue = ActionQueue(queue_size)
+
+    rewards = []
+    e = 0
+    render = True
+
+    for i in range(episodes):
+        start_f=end_f
+        stopwatch.restart()
+        loss = 0
+        # This will set the camera. Available angles:
+        # "camera" names = ('head_camera_rgb', 'gripper_camera_rgb', 'lidar', 'external_camera_0')
+        sim.render(width=500, height=500, camera_name='external_camera_0', depth=True)
+        # replace the normal env.render with this line
+        yield env.render(mode='rgb_array')
+        #time.sleep(3)
+        observation = env.reset()
+        obs = observation['observation']
+        ag = observation['achieved_goal']
+        g = observation['desired_goal']
+        g2 = observation['desired_goal2']
+        g3 = observation['desired_goal3']
+        g4 = observation['desired_goal4']
+        ep_rewards = 0
+        feedback_value = 0
+        while(True):
+            stopwatch.start()
+            sim.render(width=500, height=500, camera_name='external_camera_0', depth=True)
+            # replace the normal env.render with 
+            # this line
+            yield env.render(mode='rgb_array')
+            end_f+=1
+            ts = time.time()
+            input_tensor = preproc_inputs(env_params, obs, g, g2, g3, g4)
+            input_tensor = input_tensor[0].numpy()
+            action, dist, mu, sigma = sample_normal(agent, actor, input_tensor, with_noise=False, max_action=max_action)
+            #action, dist, mu, sigma = agent.sample_action(observation)
+            #print(action)
+            old_observation = observation
+            old_input_tensor = input_tensor
+            observation, reward, done, _ = env.step(np.append(action,[0,0]))
+            obs = observation['observation']
+            ag = observation['achieved_goal']
+            g = observation['desired_goal']
+            g2 = observation['desired_goal2']
+            g3 = observation['desired_goal3']
+            g4 = observation['desired_goal4']
+            input_tensor = preproc_inputs(env_params, obs, g, g2, g3, g4)
+            input_tensor = input_tensor[0].numpy()
+            actor.remember(old_input_tensor, action, reward, input_tensor, done)
+            episode_rewards.append(reward)
+            ep_rewards += reward
+            te = time.time()
+            tf = 0
+            # time.sleep(e) # Delay to make the game seeable
+            feedback = ""
+
+            #feedback_value = 0
+            #print(feedback_value)
+
+            all_feedback = np.genfromtxt('participant_data.csv', delimiter=',')
+            latest_feedback = all_feedback[len(all_feedback)-1] 
+            feedback = latest_feedback[0]
+            tf = latest_feedback[1]
+            if feedback == 1 or feedback == -1:
+                print("AAAISII")
+                if feedback == 1:
+                    feedback_value = 1
+                else:
+                    feedback_value = -1
+            else: 
+                feedback = 0 
+            
+            #if feedback_value != 0:
+                #agent.remember(old_input_tensor, action, feedback_value, input_tensor, done)
+
+            action_queue.enqeue([input_tensor, action, ts, te, tf, feedback_value, mu, sigma, old_input_tensor, done])
+
+            if feedback_value != 0:
+                loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value) 
+
+            actor.learn()
+            agent.learn()
+
+            if done:                                                              
+                print(ep_rewards)
+                print("Episode:", str(i))
+                rewards.append(ep_rewards)
+                ep_rewards = 0
+                all_rewards.append(episode_rewards)
+                sum_rewards.append(np.sum(episode_rewards))
+                episode_rewards = []
+                episode_num += 1
+                avg_reward = float(np.mean(episode_rewards[-10:]))
+                action_queue.clear()
+                frame = env.reset()
+                break
+    
+
+import os, glob
+import cv2
+import csv
+
+from flask import Flask, request, render_template, Response, redirect, session,send_from_directory
+from flask_wtf import FlaskForm
+from wtforms import SubmitField
+
+import numpy as np
+import gym
+from gym import wrappers
+import mujoco_py
+import torch
+
+import time
+
+from PIL import Image
+
+from PS_utils import sample_normal
+from sac_torch import Agent
+
+import gym, random, pickle, os.path, math, glob
+import stopwatch as SW
+
+from uid.uuid_manager import uuid_manager
+uuid_manager = uuid_manager()
+
+from mpi_utils.normalizer import normalizer
+
+from functools import wraps
+
+import threading
+
+DIR_PATH = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_PATH = os.path.join(DIR_PATH, 'templates/')
+
+app = Flask(__name__, template_folder=TEMPLATE_PATH, static_folder="static")
+app.secret_key = 'test key'
+
+global is_finished
+is_finished = False
+
+@app.route("/")
+def index():
+    # First do GDPR and Age checks
+    return render_template("gdpr_age.html")
+
+
+@app.route("/qualified", methods=["POST"])
+def qualified():
+    qual = request.form.get('age18', False) and request.form.get('gdpr', False)
+
+    if (qual):
+        # generate a unique uuid to offer to users
+        global uuid 
+        uuid = uuid_manager.get_uuid()
+        return redirect("/app/{}".format(uuid), code=302)
+    else:
+        return render_template("thanks.html")
+
+@app.route("/consent", methods=["POST"])
+def consent():
+    uuid = session['uuid']
+    user_info = {}
+    user_info['agreed'] = request.form.get('agreed', False)
+    session[uuid] = user_info
+    return render_template("info_lunar_toggle.html")
+
+@app.route("/info", methods=["POST"])
+def info():
+    is_finished = True
+    return redirect("/app/{}".format(uuid), code=302)
+    
+@app.route("/", methods=['GET', 'POST'])
+@app.route("/app/<uuid>", methods=['GET', 'POST'])
+def index_uuid(uuid):
+    if uuid in session:
+        if session[uuid].get('agreed'):
+            learning_loop()
+            return render_template("simulation.html", render=f"render_feed/{uuid}")
+        else:
+            return render_template("excluded_participant.html")
+    session['uuid'] = uuid
+    return render_template("consent.html", missing_data = uuid in session)
+
+@app.route('/finish', methods=['GET', 'POST'])
+def finish():
+    is_finished = True
+    return render_template("finished.html")
+
+@app.route('/send_good_feedback')
+def send_good_feedback():
+    filename = "participant_data.csv"
+    with open(filename, 'a', newline='') as csvfile:  
+        csvwriter = csv.writer(csvfile)  
+        csvwriter.writerow(["1", time.time()*1000, uuid]) 
+        csvfile.close()
+    return "nothing"
+
+@app.route('/send_bad_feedback')
+def send_bad_feedback():
+    filename = "participant_data.csv"
+    with open(filename, 'a', newline='') as csvfile:  
+        csvwriter = csv.writer(csvfile)  
+        csvwriter.writerow(["-1", time.time()*1000, uuid]) 
+        csvfile.close()
+    return "nothing"
+
+@app.route('/send_no_feedback')
+def send_no_feedback():
+    filename = "participant_data.csv"
+    with open(filename, 'a', newline='') as csvfile:  
+        csvwriter = csv.writer(csvfile)  
+        csvwriter.writerow(["0", time.time()*1000, uuid]) 
+        csvfile.close()
+    return "nothing"
+
+def frame_gen(env_func, *args, **kwargs):
+    get_frame = env_func(*args, **kwargs)
+    while is_finished == False:
+        frame = next(get_frame, None)
+        if frame is None:
+            break
+        _, frame = cv2.imencode('.png', frame)
+
+        frame = frame.tobytes()
+        yield (b'--frame\r\n' + b'Content-Type: image/png\r\n\r\n' + frame + b'\r\n')
+
+def render_browser(env_func):
+        def wrapper(*args, **kwargs):
+            print(f"/render_feed/{uuid}")
+            @wraps(wrapper)
+            @app.route(f"/render_feed/{uuid}")
+            def render_feed():
+                print(is_finished)
+                return Response(frame_gen(env_func, *args, **kwargs), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return wrapper
+
+@render_browser
+@app.route(f"/learning", methods=['GET', 'POST'])
+def learning_loop(run=True):
+    class ActionQueue:
+        def __init__(self, size=5):
+            self.size = size
+            self.queue = []
+
+        def enqeue(self, action_memory):
+            if len(self.queue) > self.size:
+                self.queue.pop()
+                self.queue.insert(0, action_memory)
+            else:
+                self.queue.insert(0, action_memory)
+
+        def push_to_buffer_and_learn(self, agent, actor, tf, feedback_value, interval_min=0, interval_max=.8):
+            if len(self.queue) == 0: return None
+            else:
+                avg_loss = []
+                i = 0
+                for action_memory in self.queue: 
+                    b = tf-action_memory[2]
+                    a = tf - action_memory[3]
+                    # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
+                    #print(a, b)
+                    pushed = (b >= interval_min and a <= interval_max)
+                    # push: state, action, ts, te, tf, feedback
+                    # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
+                    if pushed:
+                        agent.remember(action_memory[8], action_memory[1], feedback_value, action_memory[0], action_memory[9])
+                        #loss = agent.learn_from_feedback(action_memory[6], action_memory[7], action_memory[1], action_memory[5])
+                        #print("banana")
+                        #print(f"ts: {action_memory[2]}. te: {action_memory[3]}, tf: {tf}")
+                        #avg_loss.append(loss)
+                        #print(feedback_value)
+                    i += 1
+                return np.mean(np.array(avg_loss))
+
+    #env = gym.make('BipedalWalker-v3')
+    global env
+    env = gym.make('LunarLanderContinuous-v2')
+    
+    rew_filename = f"reward_data/participant_{uuid}.csv"
+    with open(rew_filename, "x", newline='') as csvfile:
+        print("Done")
+
+    # Note: these credit assignment intervals impact how the agent behaves a lot.
+    # Because of this sensitivity the model is overall very sensitive.
+    # There is a frame time delay of .1 so teaching is not boring. Could make the 
+    # the agent much better if played at around 10 frames per second (not sure of  current fps)
+    interval_min = .05
+    interval_max = .6
+
+    episodes=500
+    USE_CUDA = torch.cuda.is_available()
+    learning_rate = .001
+    replay_buffer_size = 100000
+    learn_buffer_interval = 200  # interval to learn from replay memory
+    batch_size = 200
+    print_interval = 1000
+    log_interval = 1000
+    learning_start = 100
+    #win_reward = 21     # Pong-v4
+    win_break = True
+    queue_size = 1000
+
+    agent = Agent(input_dims=env.observation_space.shape, env=env,
+                n_actions=env.action_space.shape[0])
+
+    actor = Agent(input_dims=env.observation_space.shape, env=env,
+                n_actions=env.action_space.shape[0])
+
+    frame = env.reset()
+
+
+    episode_rewards = []
+    all_rewards = []
+    sum_rewards=[]
+    losses = []
+    episode_num = 0
+    is_win = False
+
+    stopwatch = SW.Stopwatch()
+
+    cnt=0
+    start_f=0
+    end_f=0
+
+    action_queue = ActionQueue(queue_size)
+
+    rewards = []
+    e = 0.05
+    render = True
+    
+    timeout = time.time() + 60*10  # length of interaction
+
+    while time.time() < timeout:
+        start_f=end_f
+        stopwatch.restart()
+        loss = 0
+        scene =  env.render(mode='rgb_array')
+        yield scene
+        #time.sleep(3)
+        observation = env.reset()
+        ep_rewards = 0
+        feedback_value = 0
+        tf = 0
+        tf_old = 0
+        while(True):
+            #print(feedback_value)
+            stopwatch.start()
+            scene = env.render(mode='rgb_array')
+            yield scene
+            end_f+=1
+            ts = stopwatch.duration
+            action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=env.action_space.high)
+            #action, dist, mu, sigma = agent.sample_action(observation)
+            #print(action)
+            old_observation = observation
+            observation, reward, done, _ = env.step(action)
+            actor.remember(old_observation, action, reward, observation, done)
+            episode_rewards.append(reward)
+            ep_rewards += reward
+            te = time.time()
+
+            time.sleep(e) # Delay to make the game seeable
+            feedback = ""
+            all_feedback = np.genfromtxt("participant_data.csv", delimiter=',')
+
+            if len(all_feedback) > 0:
+                if len(all_feedback) == 3 and np.size(all_feedback) == 3:
+                    latest_feedback = all_feedback
+                else:
+                    latest_feedback = all_feedback[len(all_feedback)-1] 
+                feedback = latest_feedback[0]
+                tf_old = tf 
+                tf = latest_feedback[1]
+                if tf != tf_old:
+                    if feedback == 1:
+                        feedback_value = 1
+                    elif feedback == -1:
+                        feedback_value = -1
+                    else: 
+                        feedback_value = 0 
+                
+            action_queue.enqeue([observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done])
+
+            if feedback_value != 0:
+                #tf = stopwatch.duration
+                # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
+                loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value)
+                agent.remember(old_observation, action, feedback_value, observation, done)
+                #print(loss, "feedback loss")
+
+            actor.learn()
+            agent.learn()
+
+            if stopwatch.duration > 60:
+                done = True
+
+            if done:
+                with open(rew_filename, 'a', newline='') as csvfile:  
+                    csvwriter = csv.writer(csvfile)  
+                    csvwriter.writerow([episode_num, ep_rewards]) 
+                    csvfile.close()                                                         
+                print(ep_rewards)
+                print("Episode:", str(episode_num))
+                rewards.append(ep_rewards)
+                ep_rewards = 0
+                episode_rewards = []
+                episode_num += 1
+                feedback_value = 0
+                break
+    
+    img = Image.open("thankYou2.jpg")
+    arr = np.array(img)
+    yield arr
+    return True
+
+if __name__ == '__main__':
+    app.run()
+
+
+# first work with james: 
+import os, glob
+import cv2
+import csv
+
+from flask import Flask, request, render_template, Response, redirect, session,send_from_directory
+from flask_wtf import FlaskForm
+from wtforms import SubmitField
+
+import numpy as np
+import gym
+from gym import wrappers
+import mujoco_py
+import torch
+
+import time
+
+from PIL import Image
+
+from PS_utils import sample_normal
+from sac_torch import Agent
+
+import gym, random, pickle, os.path, math, glob
+import stopwatch as SW
+
+from uid.uuid_manager import uuid_manager
+uuid_manager = uuid_manager()
+
+from mpi_utils.normalizer import normalizer
+
+from functools import wraps
+
+import threading
+
+DIR_PATH = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_PATH = os.path.join(DIR_PATH, 'templates/')
+
+app = Flask(__name__, template_folder=TEMPLATE_PATH, static_folder="static")
+app.secret_key = 'test key'
+
+global is_finished
+is_finished = False
+
+@app.route("/")
+def index():
+    # First do GDPR and Age checks
+    return render_template("gdpr_age.html")
+
+
+@app.route("/qualified", methods=["POST"])
+def qualified():
+    qual = request.form.get('age18', False) and request.form.get('gdpr', False)
+
+    if (qual):
+        # generate a unique uuid to offer to users
+        global uuid 
+        uuid = uuid_manager.get_uuid()
+        return redirect("/app/{}".format(uuid), code=302)
+    else:
+        return render_template("thanks.html")
+
+@app.route("/consent", methods=["POST"])
+def consent():
+    uuid = session['uuid']
+    user_info = {}
+    user_info['agreed'] = request.form.get('agreed', False)
+    session[uuid] = user_info
+    return render_template("info_lunar_toggle.html")
+
+@app.route("/info", methods=["POST"])
+def info():
+    is_finished = True
+    return redirect("/app/{}".format(uuid), code=302)
+    
+@app.route("/", methods=['GET', 'POST'])
+@app.route("/app/<uuid>", methods=['GET', 'POST'])
+def index_uuid(uuid):
+    if uuid in session:
+        if session[uuid].get('agreed'):
+            learning_loop()
+            return render_template("simulation.html", render=f"render_{uuid}")
+        else:
+            return render_template("excluded_participant.html")
+    session['uuid'] = uuid
+    return render_template("consent.html", missing_data = uuid in session)
+
+@app.route('/finish', methods=['GET', 'POST'])
+def finish():
+    is_finished = True
+    return render_template("finished.html")
+
+@app.route('/send_good_feedback')
+def send_good_feedback():
+    filename = "participant_data.csv"
+    with open(filename, 'a', newline='') as csvfile:  
+        csvwriter = csv.writer(csvfile)  
+        csvwriter.writerow(["1", time.time()*1000, uuid]) 
+        csvfile.close()
+    return "nothing"
+
+@app.route('/send_bad_feedback')
+def send_bad_feedback():
+    filename = "participant_data.csv"
+    with open(filename, 'a', newline='') as csvfile:  
+        csvwriter = csv.writer(csvfile)  
+        csvwriter.writerow(["-1", time.time()*1000, uuid]) 
+        csvfile.close()
+    return "nothing"
+
+@app.route('/send_no_feedback')
+def send_no_feedback():
+    filename = "participant_data.csv"
+    with open(filename, 'a', newline='') as csvfile:  
+        csvwriter = csv.writer(csvfile)  
+        csvwriter.writerow(["0", time.time()*1000, uuid]) 
+        csvfile.close()
+    return "nothing"
+
+def frame_gen(env_func, *args, **kwargs):
+    get_frame = env_func(*args, **kwargs)
+    while is_finished == False:
+        frame = next(get_frame, None)
+        if frame is None:
+            break
+        _, frame = cv2.imencode('.png', frame)
+
+        frame = frame.tobytes()
+        yield (b'--frame\r\n' + b'Content-Type: image/png\r\n\r\n' + frame + b'\r\n')
+
+def render_browser(env_func):
+        def wrapper(*args, **kwargs):
+            print(f"/render_feed/{uuid}")
+            @wraps(wrapper)
+            @app.route(f"/render_feed/{uuid}", endpoint=f"render_{uuid}")
+            def render_feed():
+                print(is_finished)
+                return Response(frame_gen(env_func, *args, **kwargs), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return wrapper
+
+@render_browser
+@app.route(f"/learning", methods=['GET', 'POST'])
+def learning_loop(run=True):
+    class ActionQueue:
+        def __init__(self, size=5):
+            self.size = size
+            self.queue = []
+
+        def enqeue(self, action_memory):
+            if len(self.queue) > self.size:
+                self.queue.pop()
+                self.queue.insert(0, action_memory)
+            else:
+                self.queue.insert(0, action_memory)
+
+        def push_to_buffer_and_learn(self, agent, actor, tf, feedback_value, interval_min=0, interval_max=.8):
+            if len(self.queue) == 0: return None
+            else:
+                avg_loss = []
+                i = 0
+                for action_memory in self.queue: 
+                    b = tf-action_memory[2]
+                    a = tf - action_memory[3]
+                    # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
+                    #print(a, b)
+                    pushed = (b >= interval_min and a <= interval_max)
+                    # push: state, action, ts, te, tf, feedback
+                    # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
+                    if pushed:
+                        agent.remember(action_memory[8], action_memory[1], feedback_value, action_memory[0], action_memory[9])
+                        #loss = agent.learn_from_feedback(action_memory[6], action_memory[7], action_memory[1], action_memory[5])
+                        #print("banana")
+                        #print(f"ts: {action_memory[2]}. te: {action_memory[3]}, tf: {tf}")
+                        #avg_loss.append(loss)
+                        #print(feedback_value)
+                    i += 1
+                return np.mean(np.array(avg_loss))
+
+    #env = gym.make('BipedalWalker-v3')
+    global env
+    env = gym.make('LunarLanderContinuous-v2')
+    
+    rew_filename = f"reward_data/participant_{uuid}.csv"
+    with open(rew_filename, "x", newline='') as csvfile:
+        print("Done")
+
+    # Note: these credit assignment intervals impact how the agent behaves a lot.
+    # Because of this sensitivity the model is overall very sensitive.
+    # There is a frame time delay of .1 so teaching is not boring. Could make the 
+    # the agent much better if played at around 10 frames per second (not sure of  current fps)
+    interval_min = .05
+    interval_max = .6
+
+    episodes=500
+    USE_CUDA = torch.cuda.is_available()
+    learning_rate = .001
+    replay_buffer_size = 100000
+    learn_buffer_interval = 200  # interval to learn from replay memory
+    batch_size = 200
+    print_interval = 1000
+    log_interval = 1000
+    learning_start = 100
+    #win_reward = 21     # Pong-v4
+    win_break = True
+    queue_size = 1000
+
+    agent = Agent(input_dims=env.observation_space.shape, env=env,
+                n_actions=env.action_space.shape[0])
+
+    actor = Agent(input_dims=env.observation_space.shape, env=env,
+                n_actions=env.action_space.shape[0])
+
+    frame = env.reset()
+
+
+    episode_rewards = []
+    all_rewards = []
+    sum_rewards=[]
+    losses = []
+    episode_num = 0
+    is_win = False
+
+    stopwatch = SW.Stopwatch()
+
+    cnt=0
+    start_f=0
+    end_f=0
+
+    action_queue = ActionQueue(queue_size)
+
+    rewards = []
+    e = 0.05
+    render = True
+    
+    timeout = time.time() + 60*10  # length of interaction
+
+    while time.time() < timeout:
+        start_f=end_f
+        stopwatch.restart()
+        loss = 0
+        scene =  env.render(mode='rgb_array')
+        yield scene
+        #time.sleep(3)
+        observation = env.reset()
+        ep_rewards = 0
+        feedback_value = 0
+        tf = 0
+        tf_old = 0
+        while(True):
+            #print(feedback_value)
+            stopwatch.start()
+            scene = env.render(mode='rgb_array')
+            yield scene
+            end_f+=1
+            ts = stopwatch.duration
+            action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=env.action_space.high)
+            #action, dist, mu, sigma = agent.sample_action(observation)
+            #print(action)
+            old_observation = observation
+            observation, reward, done, _ = env.step(action)
+            actor.remember(old_observation, action, reward, observation, done)
+            episode_rewards.append(reward)
+            ep_rewards += reward
+            te = time.time()
+
+            time.sleep(e) # Delay to make the game seeable
+            feedback = ""
+            all_feedback = np.genfromtxt("participant_data.csv", delimiter=',')
+
+            if len(all_feedback) > 0:
+                if len(all_feedback) == 3 and np.size(all_feedback) == 3:
+                    latest_feedback = all_feedback
+                else:
+                    latest_feedback = all_feedback[len(all_feedback)-1] 
+                feedback = latest_feedback[0]
+                tf_old = tf 
+                tf = latest_feedback[1]
+                if tf != tf_old:
+                    if feedback == 1:
+                        feedback_value = 1
+                    elif feedback == -1:
+                        feedback_value = -1
+                    else: 
+                        feedback_value = 0 
+                
+            action_queue.enqeue([observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done])
+
+            if feedback_value != 0:
+                #tf = stopwatch.duration
+                # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
+                loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value)
+                agent.remember(old_observation, action, feedback_value, observation, done)
+                #print(loss, "feedback loss")
+
+            actor.learn()
+            agent.learn()
+
+            if stopwatch.duration > 60:
+                done = True
+
+            if done:
+                with open(rew_filename, 'a', newline='') as csvfile:  
+                    csvwriter = csv.writer(csvfile)  
+                    csvwriter.writerow([episode_num, ep_rewards]) 
+                    csvfile.close()                                                         
+                print(ep_rewards)
+                print("Episode:", str(episode_num))
+                rewards.append(ep_rewards)
+                ep_rewards = 0
+                episode_rewards = []
+                episode_num += 1
+                feedback_value = 0
+                break
+    
+    img = Image.open("thankYou2.jpg")
+    arr = np.array(img)
+    yield arr
+    return True
+
+if __name__ == '__main__':
+    app.run()
+
+
+# reset:
+import os, glob
+import cv2
+import csv
+
+from flask import Flask, request, render_template, Response, redirect, session,send_from_directory
+from flask_wtf import FlaskForm
+from wtforms import SubmitField
+
+import numpy as np
+import gym
+from gym import wrappers
+import mujoco_py
+import torch
+
+import time
+
+from PIL import Image
+
+from PS_utils import sample_normal
+from sac_torch import Agent
+
+import gym, random, pickle, os.path, math, glob
+import stopwatch as SW
+
+from uid.uuid_manager import uuid_manager
+uuid_manager = uuid_manager()
+
+from mpi_utils.normalizer import normalizer
+
+from functools import wraps
+
+from datetime import datetime
+
+from flask import Flask
+from werkzeug.serving import run_simple
+
+to_reload = False
+
+import threading
+
+DIR_PATH = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_PATH = os.path.join(DIR_PATH, 'templates/')
+
+def get_app():
+    app = Flask(__name__, template_folder=TEMPLATE_PATH, static_folder="static")
+    app.secret_key = 'test key'
+
+    global is_finished
+    is_finished = False
+
+    @app.route("/")
+    def index():
+        # First do GDPR and Age checks
+        return render_template("gdpr_age.html")
+
+
+    @app.route("/qualified", methods=["POST"])
+    def qualified():
+        qual = request.form.get('age18', False) and request.form.get('gdpr', False)
+        if (qual):
+            # generate a unique uuid to offer to users
+            global uuid 
+            uuid = uuid_manager.get_uuid()
+            return redirect("/app/{}".format(uuid), code=302)
+        else:
+            return render_template("thanks.html")
+
+    @app.route("/consent", methods=["POST"])
+    def consent():
+        uuid = session['uuid']
+        user_info = {}
+        user_info['agreed'] = request.form.get('agreed', False)
+        session[uuid] = user_info
+        return render_template("info_lunar_toggle.html")
+
+    @app.route("/info", methods=["POST"])
+    def info():
+        is_finished = True
+        return redirect("/app/{}".format(uuid), code=302)
+        
+    @app.route("/", methods=['GET', 'POST'])
+    @app.route("/app/<uuid>", methods=['GET', 'POST'])
+    def index_uuid(uuid):
+        if uuid in session:
+            if session[uuid].get('agreed'):
+                learning_loop()
+                return render_template("simulation.html", render=f"render_feed/{uuid}")
+            else:
+                return render_template("excluded_participant.html")
+        session['uuid'] = uuid
+        return render_template("consent.html", missing_data = uuid in session)
+
+    @app.route('/finish', methods=['GET', 'POST'])
+    def finish():
+        is_finished = True
+        global to_reload
+        to_reload = True
+        return render_template("finished.html")
+
+    @app.route('/send_good_feedback')
+    def send_good_feedback():
+        filename = "participant_data.csv"
+        with open(filename, 'a', newline='') as csvfile:  
+            csvwriter = csv.writer(csvfile)  
+            csvwriter.writerow(["1", time.time()*1000, uuid]) 
+            csvfile.close()
+        return "nothing"
+
+    @app.route('/send_bad_feedback')
+    def send_bad_feedback():
+        filename = "participant_data.csv"
+        with open(filename, 'a', newline='') as csvfile:  
+            csvwriter = csv.writer(csvfile)  
+            csvwriter.writerow(["-1", time.time()*1000, uuid]) 
+            csvfile.close()
+        return "nothing"
+
+    @app.route('/send_no_feedback')
+    def send_no_feedback():
+        filename = "participant_data.csv"
+        with open(filename, 'a', newline='') as csvfile:  
+            csvwriter = csv.writer(csvfile)  
+            csvwriter.writerow(["0", time.time()*1000, uuid]) 
+            csvfile.close()
+        return "nothing"
+
+    def frame_gen(env_func, *args, **kwargs):
+        get_frame = env_func(*args, **kwargs)
+        while is_finished == False:
+            frame = next(get_frame, None)
+            if frame is None:
+                break
+            _, frame = cv2.imencode('.png', frame)
+
+            frame = frame.tobytes()
+            yield (b'--frame\r\n' + b'Content-Type: image/png\r\n\r\n' + frame + b'\r\n')
+
+    def render_browser(env_func):
+            def wrapper(*args, **kwargs):
+                print(f"/render_feed/{uuid}")
+                @wraps(wrapper)
+                @app.route(f"/render_feed/{uuid}")
+                def render_feed():
+                    print(is_finished)
+                    return Response(frame_gen(env_func, *args, **kwargs), mimetype='multipart/x-mixed-replace; boundary=frame')
+            return wrapper
+
+    @render_browser
+    @app.route(f"/learning", methods=['GET', 'POST'])
+    def learning_loop(run=True):
+        class ActionQueue:
+            def __init__(self, size=5):
+                self.size = size
+                self.queue = []
+
+            def enqeue(self, action_memory):
+                if len(self.queue) > self.size:
+                    self.queue.pop()
+                    self.queue.insert(0, action_memory)
+                else:
+                    self.queue.insert(0, action_memory)
+
+            def push_to_buffer_and_learn(self, agent, actor, tf, feedback_value, interval_min=0, interval_max=.8):
+                if len(self.queue) == 0: return None
+                else:
+                    avg_loss = []
+                    i = 0
+                    for action_memory in self.queue: 
+                        b = tf-action_memory[2]
+                        a = tf - action_memory[3]
+                        # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
+                        #print(a, b)
+                        pushed = (b >= interval_min and a <= interval_max)
+                        # push: state, action, ts, te, tf, feedback
+                        # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
+                        if pushed:
+                            agent.remember(action_memory[8], action_memory[1], feedback_value, action_memory[0], action_memory[9])
+                            #loss = agent.learn_from_feedback(action_memory[6], action_memory[7], action_memory[1], action_memory[5])
+                            #print("banana")
+                            #print(f"ts: {action_memory[2]}. te: {action_memory[3]}, tf: {tf}")
+                            #avg_loss.append(loss)
+                            #print(feedback_value)
+                        i += 1
+                    return np.mean(np.array(avg_loss))
+
+        #env = gym.make('BipedalWalker-v3')
+        global env
+        env = gym.make('LunarLanderContinuous-v2')
+        
+        rew_filename = f"reward_data/participant_{uuid}.csv"
+        with open(rew_filename, "x", newline='') as csvfile:
+            print("Done")
+
+        # Note: these credit assignment intervals impact how the agent behaves a lot.
+        # Because of this sensitivity the model is overall very sensitive.
+        # There is a frame time delay of .1 so teaching is not boring. Could make the 
+        # the agent much better if played at around 10 frames per second (not sure of  current fps)
+        interval_min = .05
+        interval_max = .6
+
+        episodes=500
+        USE_CUDA = torch.cuda.is_available()
+        learning_rate = .001
+        replay_buffer_size = 100000
+        learn_buffer_interval = 200  # interval to learn from replay memory
+        batch_size = 200
+        print_interval = 1000
+        log_interval = 1000
+        learning_start = 100
+        #win_reward = 21     # Pong-v4
+        win_break = True
+        queue_size = 1000
+
+        agent = Agent(input_dims=env.observation_space.shape, env=env,
+                    n_actions=env.action_space.shape[0])
+
+        actor = Agent(input_dims=env.observation_space.shape, env=env,
+                    n_actions=env.action_space.shape[0])
+
+        frame = env.reset()
+
+
+        episode_rewards = []
+        all_rewards = []
+        sum_rewards=[]
+        losses = []
+        episode_num = 0
+        is_win = False
+
+        stopwatch = SW.Stopwatch()
+
+        cnt=0
+        start_f=0
+        end_f=0
+
+        action_queue = ActionQueue(queue_size)
+
+        rewards = []
+        e = 0.05
+        render = True
+        
+        timeout = time.time() + 60*10  # length of interaction
+
+        while time.time() < timeout:
+            start_f=end_f
+            stopwatch.restart()
+            loss = 0
+            scene =  env.render(mode='rgb_array')
+            yield scene
+            #time.sleep(3)
+            observation = env.reset()
+            ep_rewards = 0
+            feedback_value = 0
+            tf = 0
+            tf_old = 0
+            while(True):
+                #print(feedback_value)
+                stopwatch.start()
+                scene = env.render(mode='rgb_array')
+                yield scene
+                end_f+=1
+                ts = stopwatch.duration
+                action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=env.action_space.high)
+                #action, dist, mu, sigma = agent.sample_action(observation)
+                #print(action)
+                old_observation = observation
+                observation, reward, done, _ = env.step(action)
+                actor.remember(old_observation, action, reward, observation, done)
+                episode_rewards.append(reward)
+                ep_rewards += reward
+                te = time.time()
+
+                time.sleep(e) # Delay to make the game seeable
+                feedback = ""
+                all_feedback = np.genfromtxt("participant_data.csv", delimiter=',')
+
+                if len(all_feedback) > 0:
+                    if len(all_feedback) == 3 and np.size(all_feedback) == 3:
+                        latest_feedback = all_feedback
+                    else:
+                        latest_feedback = all_feedback[len(all_feedback)-1] 
+                    feedback = latest_feedback[0]
+                    tf_old = tf 
+                    tf = latest_feedback[1]
+                    if tf != tf_old:
+                        if feedback == 1:
+                            feedback_value = 1
+                        elif feedback == -1:
+                            feedback_value = -1
+                        else: 
+                            feedback_value = 0 
+                    
+                action_queue.enqeue([observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done])
+
+                if feedback_value != 0:
+                    #tf = stopwatch.duration
+                    # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
+                    loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value)
+                    agent.remember(old_observation, action, feedback_value, observation, done)
+                    #print(loss, "feedback loss")
+
+                actor.learn()
+                agent.learn()
+
+                if stopwatch.duration > 60:
+                    done = True
+
+                if done:
+                    with open(rew_filename, 'a', newline='') as csvfile:  
+                        csvwriter = csv.writer(csvfile)  
+                        csvwriter.writerow([episode_num, ep_rewards]) 
+                        csvfile.close()                                                         
+                    print(ep_rewards)
+                    print("Episode:", str(episode_num))
+                    rewards.append(ep_rewards)
+                    ep_rewards = 0
+                    episode_rewards = []
+                    episode_num += 1
+                    feedback_value = 0
+                    break
+        
+        img = Image.open("thankYou2.jpg")
+        arr = np.array(img)
+        yield arr
+        return True
+    
+
+    return app
+
+class AppReloader(object):
+    def __init__(self, create_app):
+        self.create_app = create_app
+        self.app = create_app()
+
+    def get_application(self):
+        global to_reload
+        if to_reload:
+            self.app = self.create_app()
+            to_reload = False
+
+        return self.app
+
+    def __call__(self, environ, start_response):
+        app = self.get_application()
+        return app(environ, start_response)
+
+application = AppReloader(get_app)
+
+if __name__ == '__main__':
+    run_simple('localhost', 5000, application,
+            use_reloader=True, use_debugger=True, use_evalex=True, threaded=True)

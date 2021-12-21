@@ -1,0 +1,6 @@
+"$python make_uuid.py" will use the lists of colors, adjective, and nouns to generate a list of uids (uuids.txt), as well as a file that holds the index of the next uuid (uuid_count.txt).
+
+Do not run this more than once for a set of uuids or the count will be wrong and the same uuid will be issued multiples times.
+
+
+uuid_manager.py grabs the next uuid from the file, increments the index, and returns the uuid. 

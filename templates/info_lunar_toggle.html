@@ -1,0 +1,79 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='video_format.css') }}"/>
+<style>
+  div.main{
+    max-width: 600px;
+    margin: 20px auto;
+    border-radius: 25px;
+    border: 2px solid #73AD21;
+    padding: 5px 30px 20px 30px;
+  }
+  div.error{
+    color: red;
+  }
+</style>
+<div class="main">
+  <div>
+    <h1>Task Description</h1>
+    <h2>Tufts University - Task Description and Controls</h2>
+      <h3>Virtual Agents learning from human interaction</h3>
+    <p>
+Below is a description of the task you will be asked to complete for this study:
+</p>
+<p>
+<h4>What is the task?</h4>
+On the next page you will be asked to train a program to land a rocket on the landing pad.
+In this control problem the computer will be able to perform 4 actions: fire left engine, fire right engine, fire main (forward engine),
+ and do nothing to move toward the landing pad.
+Your goal is to teach the program to land between the goal posts with both legs on the ground while using the engines a minimal amount.
+The landing pad and rocket will always start at the same location. </p>
+
+
+                  <div class="Shared-Video" style="padding-bottom:100.0%">
+                            <div class="Shared-Video-container Shared-Video-container--shadow-large">
+                              <div class="Shared-Video-caption" style="display: block;">Lunar Lander Demo</div>
+                              <div class="Shared-Video-player">
+                  <video id="Shared-Video" loop="loop"controls autoplay ><source src={{ url_for('static', filename="lunar.mp4") }} type="video/mp4"></video>
+
+                              </div>
+                            </div>
+
+                       </div>
+    <p>
+<h4>What are the teaching controls?</h4>
+You will be able to teach the program to complete the task using a “positive,” “negative,” and “off” toggle buttons. When the toggle is set to “positive” the program will receive continuous positive feedback that makes it more likely to repeat its current action. 
+The program will only stop receiving positive feedback once the “negative” or “off” toggle is selected. When the toggle is set to “negative” the program will receive continuous negative feedback that makes it less likely to repeat its current action. The program will only stop receiving negative feedback once the “positive” or “off” toggle is selected. If the “off” toggle is selected the program will receive no feedback from the user on its actions until the “positive” or “negative” toggle is selected.
+    </p>
+    <p>
+
+
+<h4>Important Note</h4>
+On the next screen, a small duplicate window outside of your browser will pop-up. Please click anywhere on the webpage and the duplicate window will go away. After the 
+duration of the study the window will automatically close. Thank you.
+    </p>
+
+<h4>Duration</h4>
+The interaction will last for approximately 10 minutes. After 10 minutes the external window will close and you will be prompted to complete the study.
+    </p>
+
+<form action="/info" method="post">
+  <input type="checkbox" id="info" name="info" value="info">
+  <label for="info">I have read the above and will act in good faith to complete the objectives described above.</label><br><br>
+  <input type="submit" value="Submit"></input>
+</form>
+<!-- {%if missing_data%}
+<div class="error">
+  Please confirm your consent and sign before submitting.
+</div>
+{% endif %} -->
+
+
+<!-- Required content -->
+<br>
+The Tufts computer science department is committed to making its digital environment accessible to all users, and welcomes comments or suggestions on access improvements.  Please send comments or suggestions on accessibility to the aabl_participants@cs.tufts.edu.
+<br>
+<a href="https://oeo.tufts.edu/policies-procedures/non-discrimination-statement/">Tufts non-discrimination statement</a><br>
+<a href="https://www.tufts.edu/about/privacy">Tufts privacy and terms of use statements</a>
+
+
+
+</div>

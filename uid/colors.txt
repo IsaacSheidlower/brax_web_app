@@ -1,0 +1,15 @@
+red
+yellow
+blue
+brown
+orange
+green
+violet
+black
+white
+dandelion
+cerulean
+apricot
+scarlet
+indigo
+gray

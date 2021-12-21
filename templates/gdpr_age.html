@@ -1,0 +1,45 @@
+<style>
+    div.main{
+      max-width: 600px;
+      margin: 20px auto;
+      border-radius: 25px;
+      border: 2px solid #73AD21;
+      padding: 5px 30px 20px 30px;
+    }
+    div.error{
+      color: red;
+    }
+  </style>
+  <div class="main">
+    <div>
+      <h1>Welcome!</h1>
+      <h2>Tufts University - Qualification to Participate in a Research Study</h2>
+      <p>
+        This Study has been prepared for persons who are not in Europe due to the European Union’s General Data Protection Regulation (GDPR). It is also limited to persons who are at least 18 years old. Please confirm below that you meet these requirements. If you do, additional information will be provided. 
+        We thank you for your consideration and willingness to participate.
+    </p>
+  <form action="/qualified" method="post">
+    <input type="checkbox" id="age18" name="age18" value="age18">
+    <label for="age18">I am at least 18+ years old.</label><br>
+    <input type="checkbox" id="gdpr" name="gdpr" value="gdpr">
+    <label for="gdpr">I am not currently in a European Economic Area (EEA) country.</label><br><br>
+    <label for="signature">By clicking submit, you verify the above information is true.</label><br><br>
+    <input type="submit" value="Submit"></input>
+  </form>
+  <!-- {%if missing_data%}
+  <div class="error">
+    Please confirm your consent and sign before submitting.
+  </div>
+  {% endif %} -->
+  
+  
+  <!-- Required content -->
+  <br>
+  The Tufts computer science department is committed to making its digital environment accessible to all users, and welcomes comments or suggestions on access improvements.  Please send comments or suggestions on accessibility to the aabl_participants@cs.tufts.edu.
+  <br>
+  <a href="https://oeo.tufts.edu/policies-procedures/non-discrimination-statement/">Tufts non-discrimination statement</a><br>
+  <a href="https://www.tufts.edu/about/privacy">Tufts privacy and terms of use statements</a>
+  
+  
+  
+  </div>

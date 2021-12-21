@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Gym Simulation</title>
+    <style>
+    body {text-align: center;}
+
+    table {text-align:center;}
+
+    .center {
+        display: block;
+        margin-left: auto;
+        margin-right: 250px;
+        width: 50%;
+        }
+
+    .button {
+      border: 2px solid black;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+
+    .button1 {background-color: red;} /* Red */
+    .button2 {background-color: green;} /* Green */
+    .button3 {background-color: blue;} /* Blue */
+    .button1:focus{
+      background-color: darkred;
+    }
+    .button2:focus{
+      background-color:darkgreen;
+    }
+    .button3:focus{
+      background-color: darkblue;
+    }
+
+
+    .finish {
+    width: 15em;  height: 2em;
+    }
+    </style>
+  </head>
+
+  <body>
+  <h1>OpenAI Gym Simulation</h1>
+    <table id="wrapper" class="center">
+        <tr>
+            <td><img src="{{ url_for(render) }}"></td>
+        </tr>
+    </table>
+
+    <!--<p style="color: red"><b>Paused!</b></p>
+
+    <p><b>Given the current image you see, click score=0 if you think the robot is doing the wrong thing</b></p>
+    <p><b>Click score=1 if you think the robot is doing the correct thing</b></p> -->
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type=text/javascript>
+            $(function() {
+              $('a#good').bind('click', function() {
+                $.getJSON('/send_good_feedback/{{uuid}}',
+                    function(data) {
+                  //do nothing
+                });
+            return false;
+          });
+        });
+    </script>
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type=text/javascript>
+            $(function() {
+              $('a#bad').bind('click', function() {
+                $.getJSON('/send_bad_feedback/{{uuid}}',
+                    function(data) {
+                  //do nothing
+                });
+            return false;
+          });
+        });
+    </script>
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type=text/javascript>
+            $(function() {
+              $('a#none').bind('click', function() {
+                $.getJSON('/send_no_feedback/{{uuid}}',
+                    function(data) {
+                  //do nothing
+                });
+            return false;
+          });
+        });
+    </script>
+
+    <form>
+        <a href=# id=good><button class='button button2'>Good</button></a>
+        <a href=# id=bad><button class='button button1'>Bad</button></a>
+        <a href=# id=none><button class='button button3'>None</button></a>
+    </form>
+    
+    <br>
+    <br>
+    <br>
+    <br>
+    <!--<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type=text/javascript>
+            $(function() {
+              $('a#finish').bind('click', function() {
+                $.getJSON('/finish/<uuid>',
+                    function(data) {
+                  //do nothing
+                });
+            return false;
+          });
+        });
+    </script>
+
+    <form>
+      <a href=# id=finish><button class='finish'>Finish</button></a>
+    </form>-->
+    <form action="/finish/{{uuid}}>" method="post">
+      <input type="submit" value="Finish" class="finish"></input>
+    </form>
+
+
+  </body>
+</html>

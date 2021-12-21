@@ -1,0 +1,126 @@
+﻿  <style>
+  div.main{
+    max-width: 600px;
+    margin: 20px auto;
+    border-radius: 25px;
+    border: 2px solid #73AD21;
+    padding: 5px 30px 20px 30px;
+  }
+  div.error{
+    color: red;
+  }
+</style>
+<div class="main">
+  <div>
+    <h1>Welcome!</h1>
+    <h2>Tufts University - Consent to Participate in a Research Study</h2>
+      <h3>Virtual Agents learning from human interaction</h3>  
+    <p>
+You are being asked to volunteer in a research study. Please find below information about this research for you to carefully consider when deciding about whether or not to participate. Please e-mail questions about any of the information you do not understand to aabl_participants@cs.tufts.edu before you decide whether to participate.
+</p>
+<p>
+<h4>What is this study about?</h4>
+Researchers at Tufts University are conducting a study on virtual agents learning from human interaction. The purpose of this research is to enable a robot to use interaction in order to obtain more useful information from human teachers.  You are being asked to participate because you have come to this website.  You are one of 10,000 participants to take part in this study. Your participation in the study is expected to last ten minutes. The study is supported by Tufts University, who is sponsoring this research.
+
+We’re hoping to build on this study in the future, so we’ve given you a unique identifier that appears in the URL at the top of this page and takes the form of three words. It looks like <em>https://hri-gym.cs.tufts.edu/app/<strong>{UUID}</strong></em>. We hope you’ll hold onto your identifier and be come back so your agents can continue to learn from you over time.
+    </p>
+    <p>
+<h4>What will happen during this research?</h4>
+If you agree to be in this research, your participation will include interacting with one or more virtual agents and answering a questionnaire. The procedure will occur in the following order:
+<ol>
+  <li>A task will be explained</li>
+  <li>You will use an on-screen GUI to interact with the agents, interact with the virtual environment, or provide feedback to the agents indicating their performance at the task.</li>
+  <li>The task may be repeated.</li>
+  <li>When the task ends you will be issued a questionnaire where you will select radio-buttons to indicate your response.</li>
+</ol>
+You may also be asked questions in pop-up menus as you interact with the agents.
+    </p>
+    <p>
+<h4>What will you do to protect my privacy?</h4>
+The results of the study may be published. We will take measures to protect your privacy and confidentiality including encrypting all data related to your interactions and limiting data access to research team members. We will not collect your name or any other information that could directly identify you. Despite taking steps to protect your privacy, we can never fully guarantee your privacy will be protected. If you tell us something that makes us believe that you or others have been or may be physically harmed, we may report that information to the appropriate agencies. 
+
+Individuals and organizations responsible for conducting or monitoring this research may be permitted access to and inspect the research records. This includes Tufts Social, Behavioral & Educational Research Institutional Review Board (Tufts SBER IRB), Dr. Elaine Short, and research team members.
+
+The interaction data we collect will be retained and could be used for future research studies or distributed to another investigator for future research studies without your additional informed consent.
+    </p>
+    <p>
+<h4>What are the risks or discomforts associated with this research?</h4>
+The risks or discomforts associated with the research are to your privacy. These risks are minimal, as we will not collect any directly identifiable information (e.g. name, location, IP address), but we will collect interaction data that might describe you in some hereto unknowable way. If we had a data breach this interaction data might become public. 
+    </p>
+    <p>
+<h4>How might I benefit from this research?</h4>
+There may be no personal benefit from your participation, but the knowledge received may be of value to humanity.
+</p>
+<p>
+<h4>What is the compensation for the research?</h4>
+You will not receive any compensation for your participation in this study. 
+</p>
+<p>
+<h4>What will happen if I choose not to participate?</h4>
+It is your choice to participate or not to participate in this research. Participation is voluntary. The alternative to participation is not participating. 
+</p>
+<p>
+<h4>Is my participation voluntary, and can I withdraw?</h4>
+Taking part in this research study is your decision. Your participation in this study is voluntary. You do not have to take part in this study, but if you do, you can stop at any time. Your decision whether to participate will not affect your relationship with Tufts University. There is no penalty if you do not participate. 
+
+You have the right to choose not to participate in any study activity or completely withdraw from continued participation at any point in this study without penalty. 
+
+If you withdraw from the study, the data collected to the point of withdrawal will be retained. You will be able to e-mail aabl_participants@cs.tufts.edu with your assigned UUID to request that your data be deleted. 
+</p>
+<p>
+<h4>Can I be removed from the research without my OK?</h4>
+We can remove you from the research study without your approval. Reasons we would do this include intentionally antagonistic interaction meant to disrupt learning. 
+</p>
+<p>
+<h4>Who do I talk to if I have questions?</h4>
+If you have questions, concerns, or have experienced a research-related injury, contact the research team at:
+<address>
+  Elaine Short <br>
+  617-627-2225 <br>
+  elaine.short@tufts.edu <br>
+</address>
+    </p>
+
+    <p>
+An Institutional Review Board (“IRB”) is overseeing this research. An IRB is a group of people who perform independent review of research studies to ensure the rights and welfare of participants are protected.  If you have questions about your rights or wish to speak with someone other than the research team, you may contact:
+<address>
+Tufts Social, Behavioral, and Educational Research IRB <br>
+75 Kneeland Street, Suite 623 <br>
+Boston, MA 02111 <br>
+617.627.8804 <br>
+SBER@tufts.edu <br>
+</address>
+    </p>
+    If you would like documentation linking yourself with this research, please e-mail aabl_participants@cs.tufts.edu with your UUID and the subject "link me".
+    <p>
+    </p>
+    <p>
+    </p>
+    <p><h4>Statement of Consent</h4> 
+      If you are under 18 or currently in a European Economic Area (EEA) country, you are not eligible for this study.
+      <br> <br>
+      I have read and considered the information presented in this form. I confirm that I understand the purpose of the research and the study procedures. I understand that I may e-mail questions at any time to aabl_participants@cs.tufts.edu and can withdraw my participation without prejudice. By checking the box below, I indicate my willingness to participate in this study.</p>
+  </div>
+<form action="/consent" method="post">
+  <input type="checkbox" id="agreed" name="agreed" value="agreed">
+  <label for="agreed">I have read the above and I consent to participate in this study.</label><br><br>
+  <label for="signature">By clicking submit, you verify the above information is true and consent to participate in this study.</label><br><br>
+  <input type="submit" value="Submit"></input>
+</form>
+<!-- {%if missing_data%}
+<div class="error">
+  Please confirm your consent and sign before submitting.
+</div>
+{% endif %} -->
+
+
+<!-- Required content -->
+<br>
+The Tufts computer science department is committed to making its digital environment accessible to all users, and welcomes comments or suggestions on access improvements.  Please send comments or suggestions on accessibility to the aabl_participants@cs.tufts.edu.
+<br>
+<a href="https://oeo.tufts.edu/policies-procedures/non-discrimination-statement/">Tufts non-discrimination statement</a><br>
+<a href="https://www.tufts.edu/about/privacy">Tufts privacy and terms of use statements</a>
+
+
+
+</div>
