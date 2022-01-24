@@ -15,7 +15,7 @@ def sample_normal(agent, actor, observation, with_noise=False, max_action=2, env
         sigma2 = sigma2.detach().numpy()
         #mu = (mu1 + mu2)/2
 
-        kl = np.tanh(np.log(np.sqrt(sigma2)/np.sqrt(sigma2)) + (sigma2+(mu1-mu2)**2)/(2*sigma2) - .5)
+        kl = np.maximum(np.tanh(np.log(np.sqrt(sigma2)/np.sqrt(sigma2)) + (sigma2+(mu1-mu2)**2)/(2*sigma2) - .5),0)
         for i in range(len(kl)):
             if kl[i] > .9:
                 kl[i] = .9

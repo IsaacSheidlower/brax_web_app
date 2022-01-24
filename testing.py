@@ -260,8 +260,8 @@ def learning_loop(uuid, end=False):
     agent = Agent(alpha=.001, beta=.001, max_size=100000, layer1_size=256, layer2_size=256, input_dims=(env.observation_size,), env=env,
                 n_actions=env.action_size, reward_scale=10)
 
-    actor = Agent(alpha=.001, beta=.001, layer1_size=256, layer2_size=256, input_dims=(env.observation_size,), env=env,
-                n_actions=env.action_size, reward_scale=2)
+    actor = Agent(alpha=.001, beta=.001, layer1_size=64, layer2_size=64, input_dims=(env.observation_size,), env=env,
+                n_actions=env.action_size, reward_scale=2, auto_entropy=False)
 
     observation = state.obs
 

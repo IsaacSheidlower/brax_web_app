@@ -73,9 +73,9 @@ def index():
 
 @app.route("/qualified", methods=["POST"])
 def qualified():
-    active = np.genfromtxt("session_is_active.csv", delimiter=',')
-    if active == 1.0:
-        return render_template("server_is_busy.html")
+    #active = np.genfromtxt("session_is_active.csv", delimiter=',')
+    #if active == 1.0:
+    #    return render_template("server_is_busy.html")
     qual = request.form.get('age18', False) and request.form.get('gdpr', False)
     if (qual):
         # generate a unique uuid to offer to users
@@ -239,8 +239,8 @@ def learning_loop(uuid, end=False):
     # Because of this sensitivity the model is overall very sensitive.
     # There is a frame time delay of .1 so teaching is not boring. Could make the 
     # the agent much better if played at around 10 frames per second (not sure of  current fps)
-    interval_min = .1
-    interval_max = .8
+    interval_min = 0.1
+    interval_max = 0.8
 
     episodes=500
     USE_CUDA = torch.cuda.is_available()
@@ -257,11 +257,11 @@ def learning_loop(uuid, end=False):
 
     print(env.observation_size)
 
-    agent = Agent(alpha=.001, beta=.001, max_size=100000, layer1_size=256, layer2_size=256, input_dims=(env.observation_size,), env=env,
+    agent = Agent(alpha=.001, beta=.001, max_size=100000, layer1_size=64, layer2_size=64, input_dims=(env.observation_size,), env=env,
                 n_actions=env.action_size, reward_scale=10)
 
-    actor = Agent(alpha=.001, beta=.001, layer1_size=256, layer2_size=256, input_dims=(env.observation_size,), env=env,
-                n_actions=env.action_size, reward_scale=2, auto_entropy=True)
+    actor = Agent(alpha=.001, beta=.001, layer1_size=64, layer2_size=64, input_dims=(env.observation_size,), env=env,
+                n_actions=env.action_size, reward_scale=2, auto_entropy=False)
 
     observation = state.obs
 
@@ -285,7 +285,7 @@ def learning_loop(uuid, end=False):
     e = 0.0
     render = True
     
-    timeout = time.time() + 60*40  # length of interaction
+    timeout = time.time() + 60*15  # length of interaction
 
     true_done = False
     while time.time() < timeout and true_done == False:
@@ -304,6 +304,7 @@ def learning_loop(uuid, end=False):
         observation = state.obs
         reward = state.reward
         done = state.done
+        yield image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
 
         #yield scene
         #time.sleep(3)
@@ -314,6 +315,7 @@ def learning_loop(uuid, end=False):
         feedback_value = 0
         tf = 0
         tf_old = 0
+        time.sleep(.1)
         while(True):
             #print(feedback_value)
             stopwatch.start()
@@ -395,9 +397,9 @@ def learning_loop(uuid, end=False):
                 episode_num += 1
                 feedback_value = 0
 
-                #if len(rewards) > 0:
-                    #if rewards[len(rewards)-1] >= 200:
-                        #true_done = True
+                if len(rewards) > 0:
+                    if rewards[len(rewards)-1] >= 400:
+                        true_done = True
                 break
 
             active = np.genfromtxt("session_is_active.csv", delimiter=',')
@@ -406,7 +408,8 @@ def learning_loop(uuid, end=False):
                 break         
             
     finished = True
-    env.close()
+    #env.close()
+    del env, agent, actor
     img = Image.open("thankYou2.jpg")
     arr = np.array(img)
     yield arr
