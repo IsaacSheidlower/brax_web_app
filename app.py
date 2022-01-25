@@ -1,4 +1,5 @@
 import os, glob
+import functools
 from typing import MutableMapping
 import cv2
 import csv
@@ -72,9 +73,9 @@ def index():
 
 @app.route("/qualified", methods=["POST"])
 def qualified():
-    active = np.genfromtxt("session_is_active.csv", delimiter=',')
-    if active == 1.0:
-        return render_template("server_is_busy.html")
+    #active = np.genfromtxt("session_is_active.csv", delimiter=',')
+    #if active == 1.0:
+    #    return render_template("server_is_busy.html")
     qual = request.form.get('age18', False) and request.form.get('gdpr', False)
     if (qual):
         # generate a unique uuid to offer to users
@@ -212,14 +213,24 @@ def learning_loop(uuid, end=False):
 
     #env = gym.make('BipedalWalker-v3')
     
-    env = gym.make('LunarLanderContinuous-v2')
-    env.viewer = None
+    #env = gym.make('LunarLanderContinuous-v2')
+    #env.viewer = None
 
-    environment = "ur5e"  # @param ['ant', 'halfcheetah', 'hopper', 'humanoid', 'reacher', 'walker2d', 'fetch', 'grasp', 'ur5e']
-    env2 = envs.create(env_name=environment)
-    state2 = env2.reset(rng=jp.random_prngkey(seed=0))
+    environment = "inverted_pendulum"  # @param ['ant', 'halfcheetah', 'hopper', 'humanoid', 'reacher', 'walker2d', 'fetch', 'grasp', 'ur5e']
+    env = envs.create(env_name=environment)
+    state = env.reset(rng=jp.random_prngkey(seed=0))
+    state = jax.jit(env.step)(state, jnp.ones((env.action_size,)))
     #env = wrappers.Monitor(env, "media", video_callable=False, force=True)
     
+    # entry_point = functools.partial(envs.create_gym_env, env_name='reacher')
+    # if 'brax-reacher-v0' not in gym.envs.registry.env_specs:
+    #     gym.register('brax-reacher-v0', entry_point=entry_point)
+
+    # env = gym.make("brax-reacher-v0", batch_size=1)
+
+    # env = to_torch.JaxToTorchWrapper(env, device='cpu')
+
+
     rew_filename = f"reward_data/participant_{uuid}.csv"
     with open(rew_filename, "x", newline='') as csvfile:
         print("Done")
@@ -228,8 +239,8 @@ def learning_loop(uuid, end=False):
     # Because of this sensitivity the model is overall very sensitive.
     # There is a frame time delay of .1 so teaching is not boring. Could make the 
     # the agent much better if played at around 10 frames per second (not sure of  current fps)
-    interval_min = .1
-    interval_max = .8
+    interval_min = 0.1
+    interval_max = 0.8
 
     episodes=500
     USE_CUDA = torch.cuda.is_available()
@@ -244,16 +255,15 @@ def learning_loop(uuid, end=False):
     win_break = True
     queue_size = 1000
 
-    agent = Agent(alpha=.001, beta=.001, max_size=100000, input_dims=env.observation_space.shape, env=env,
-                n_actions=env.action_space.shape[0], reward_scale=10)
+    print(env.observation_size)
 
-    actor = Agent(alpha=.001, beta=.001,input_dims=env.observation_space.shape, env=env,
-                n_actions=env.action_space.shape[0], reward_scale=2)
+    agent = Agent(alpha=.001, beta=.001, max_size=100000, layer1_size=64, layer2_size=64, input_dims=(env.observation_size,), env=env,
+                n_actions=env.action_size, reward_scale=10)
 
-    agent.critic_1 = actor.critic_1
-    actor.critic_2 = agent.critic_2
+    actor = Agent(alpha=.001, beta=.001, layer1_size=64, layer2_size=64, input_dims=(env.observation_size,), env=env,
+                n_actions=env.action_size, reward_scale=2, auto_entropy=False)
 
-    frame = env.reset()
+    observation = state.obs
 
 
     episode_rewards = []
@@ -272,7 +282,7 @@ def learning_loop(uuid, end=False):
     action_queue = ActionQueue(queue_size)
 
     rewards = []
-    e = 0.05
+    e = 0.0
     render = True
     
     timeout = time.time() + 60*15  # length of interaction
@@ -283,36 +293,57 @@ def learning_loop(uuid, end=False):
         start_f=end_f
         stopwatch.restart()
         loss = 0
-        scene =  env.render(mode='rgb_array')
 
-        action2 = jp.ones((env2.action_size,)) * jp.sin(end_f * jp.pi / 15)
+        #state = env.reset(rng=jp.random_prngkey(seed=0))
+        
+        action = jp.ones((env.action_size,)) * jp.sin(end_f * jp.pi / 15)
         #state = jax.jit(env.step)(state, action)
-        state2 = env2.step(state2, action2)
-        yield image.render_array(env2.sys, state2.qp, 100, 100)
+        #state = env.step(state, action)
+        state = jax.jit(env.step)(state, action)
+        #yield image.render_array(env.sys, state.qp, width=500, height=500)
+        observation = state.obs
+        reward = state.reward
+        done = state.done
+        yield image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
 
         #yield scene
         #time.sleep(3)
-        observation = env.reset()
+        # observation = env.reset()
+        # observation = observation.numpy()[0]
+        # print(observation)
         ep_rewards = 0
         feedback_value = 0
         tf = 0
         tf_old = 0
+        time.sleep(.1)
         while(True):
             #print(feedback_value)
             stopwatch.start()
-            scene = env.render(mode='rgb_array')
+            #scene = env.render(mode='rgb_array')
             #yield scene
-            action2 = jp.ones((env2.action_size,)) * jp.sin(end_f * jp.pi / 15)
+            #action = jp.ones((env.action_size,)) * jp.sin(end_f * jp.pi / 15)
             #state = jax.jit(env.step)(state, action)
-            state2 = env2.step(state2, action2)
-            yield image.render_array(env2.sys, state2.qp, 500, 500)
+            #state = env.step(state, action)
+            #state = jax.jit(env.step)(state, action)
+            #yield image.render_array(env.sys, state.qp, width=400, height=400)
+
             end_f+=1
             ts = stopwatch.duration
-            action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=env.action_space.high)
+            action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=1)
             #action, dist, mu, sigma = agent.sample_action(observation)
             #print(action)
             old_observation = observation
-            observation, reward, done, _ = env.step(action)
+
+            #observation, reward, done, _ = env.step(torch.tensor(np.array(action[None,:])))
+            #observation = observation.numpy()[0]
+            #state = env.step(state, action)
+            state = jax.jit(env.step)(state, action)
+            yield image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
+            observation = state.obs
+            reward = state.reward
+            done = state.done
+            #print("AAAA")
+            
             actor.remember(old_observation, action, reward, observation, done)
             episode_rewards.append(reward)
             ep_rewards += reward
@@ -366,9 +397,9 @@ def learning_loop(uuid, end=False):
                 episode_num += 1
                 feedback_value = 0
 
-                #if len(rewards) > 0:
-                    #if rewards[len(rewards)-1] >= 200:
-                        #true_done = True
+                if len(rewards) > 0:
+                    if rewards[len(rewards)-1] >= 400:
+                        true_done = True
                 break
 
             active = np.genfromtxt("session_is_active.csv", delimiter=',')
@@ -377,7 +408,8 @@ def learning_loop(uuid, end=False):
                 break         
             
     finished = True
-    env.close()
+    #env.close()
+    del env, agent, actor
     img = Image.open("thankYou2.jpg")
     arr = np.array(img)
     yield arr
