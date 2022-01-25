@@ -21,18 +21,24 @@ Below is a description of the task you will be asked to complete for this study:
 </p>
 <p>
 <h4>What is the task?</h4>
-On the next page you will be asked to train a program to land a rocket on the landing pad.
-In this control problem the computer will be able to perform 4 actions: fire left engine, fire right engine, fire main (forward engine),
- and do nothing to move toward the landing pad.
-Your goal is to teach the program to land between the goal posts with both legs on the ground while using the engines a minimal amount.
-The landing pad and rocket will always start at the same location. </p>
+On the next page you will be asked to balance a pendulum. In this control problem,
+the pendulum is able to move either toward or away from the balanced “center” where the
+rod of the pendulum is perpendicular to the ground. The longer the pendulum is balanced, the higher score it recieves. 
+If the pendulum falls or has balanced for 60 seconds, it will reset to its start position and try again. 
+Your task is to balance the pendulum (prevent the pendulum from falling) 
+by providing either “good,” “bad,” or “none” feedback using the buttons on the bottom of the screen. 
+ “Good” feedback should be provided when the pendulum moves closer to the horizontal
+center or is balanced. “Bad” feedback should be provided when the pendulum moves
+ further from the horizontal center and closer to falling on its side. “None” feedback should be provided
+ when you do not wish to provide "good" nor "bad" feedback.
+ </p>
 
 
                   <div class="Shared-Video" style="padding-bottom:100.0%">
                             <div class="Shared-Video-container Shared-Video-container--shadow-large">
                               <div class="Shared-Video-caption" style="display: block;">Lunar Lander Demo</div>
                               <div class="Shared-Video-player">
-                  <video id="Shared-Video" loop="loop"controls autoplay ><source src={{ url_for('static', filename="lunar.mp4") }} type="video/mp4"></video>
+                  <video id="Shared-Video" loop="loop"controls autoplay ><source src={{ url_for('static', filename="pendulum_demo.mp4") }} type="video/mp4"></video>
 
                               </div>
                             </div>
@@ -40,19 +46,20 @@ The landing pad and rocket will always start at the same location. </p>
                        </div>
     <p>
 <h4>What are the teaching controls?</h4>
-You will be able to teach the program to complete the task using a “positive,” “negative,” and “off” toggle buttons. When the toggle is set to “positive” the program will receive continuous positive feedback that makes it more likely to repeat its current action. 
-The program will only stop receiving positive feedback once the “negative” or “off” toggle is selected. When the toggle is set to “negative” the program will receive continuous negative feedback that makes it less likely to repeat its current action. The program will only stop receiving negative feedback once the “positive” or “off” toggle is selected. If the “off” toggle is selected the program will receive no feedback from the user on its actions until the “positive” or “negative” toggle is selected.
+You will be able to teach the program to complete the task using a “good,” “bad,” and “none” toggle buttons. When the toggle is set to “good” the program will receive continuous positive feedback that makes it 
+more likely to repeat its current action.
+The program will only stop receiving positive feedback once the “bad” or "none" toggle is selected.
+When the toggle is set to “bad” the program will receive continuous
+ negative feedback that makes it less likely to repeat its current action.
+  The program will only stop receiving negative feedback once the
+  “good” or “none” toggle is selected. If the “none” toggle is selected
+   the program will receive no feedback from the user on its actions until the “good” or “bad” toggle is selected.
     </p>
     <p>
 
-
-<h4>Important Note</h4>
-On the next screen, a small duplicate window outside of your browser will pop-up. Please click anywhere on the webpage and the duplicate window will go away. After the 
-duration of the study the window will automatically close. Thank you.
-    </p>
-
 <h4>Duration</h4>
-The interaction will last for approximately 10 minutes. After 10 minutes the external window will close and you will be prompted to complete the study.
+The interaction will last for approximately 15 minutes.
+ After 15 minutes the external window will close and you will be prompted to complete the study.
     </p>
 
 <form action="/info" method="post">
