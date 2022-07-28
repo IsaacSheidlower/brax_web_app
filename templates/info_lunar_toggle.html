@@ -21,24 +21,19 @@ Below is a description of the task you will be asked to complete for this study:
 </p>
 <p>
 <h4>What is the task?</h4>
-On the next page you will be asked to balance a pendulum. In this control problem,
-the pendulum is able to move either toward or away from the balanced “center” where the
-rod of the pendulum is perpendicular to the ground. The longer the pendulum is balanced, the higher score it recieves. 
-If the pendulum falls or has balanced for 60 seconds, it will reset to its start position and try again. 
-Your task is to balance the pendulum (prevent the pendulum from falling) 
-by providing either “good,” “bad,” or “none” feedback using the buttons on the bottom of the screen. 
- “Good” feedback should be provided when the pendulum moves closer to the horizontal
-center or is balanced. “Bad” feedback should be provided when the pendulum moves
- further from the horizontal center and closer to falling on its side. “None” feedback should be provided
- when you do not wish to provide "good" nor "bad" feedback.
+PendulumBot is learning to balance. Your job is to give the robot feedback on how it’s doing, using the buttons at the bottom of the screen.
+If the PendulumBot falls or has balanced for 60 seconds, it will reset to its start position and try again. 
+Feedback can be provided either “good” or “bad” feedback using the buttons on the bottom of the screen. 
+ “Good” feedback should be provided when PendulumBot is balancing or trying to balance near its vertical center. “Bad” feedback should be provided when the pendulum appears
+  to be falling on its side.
  </p>
 
 
                   <div class="Shared-Video" style="padding-bottom:100.0%">
                             <div class="Shared-Video-container Shared-Video-container--shadow-large">
-                              <div class="Shared-Video-caption" style="display: block;">Lunar Lander Demo</div>
+                              <div class="Shared-Video-caption" style="display: block;">PedulumBot Teaching Demo</div>
                               <div class="Shared-Video-player">
-                  <video id="Shared-Video" loop="loop"controls autoplay ><source src={{ url_for('static', filename="pendulum_demo.mp4") }} type="video/mp4"></video>
+                  <video id="Shared-Video" loop="loop"controls autoplay ><source src={{ url_for('static', filename="pendulum_feedback_demo.mp4") }} type="video/mp4"></video>
 
                               </div>
                             </div>
@@ -46,20 +41,24 @@ center or is balanced. “Bad” feedback should be provided when the pendulum m
                        </div>
     <p>
 <h4>What are the teaching controls?</h4>
-You will be able to teach the program to complete the task using a “good,” “bad,” and “none” toggle buttons. When the toggle is set to “good” the program will receive continuous positive feedback that makes it 
-more likely to repeat its current action.
-The program will only stop receiving positive feedback once the “bad” or "none" toggle is selected.
-When the toggle is set to “bad” the program will receive continuous
- negative feedback that makes it less likely to repeat its current action.
-  The program will only stop receiving negative feedback once the
-  “good” or “none” toggle is selected. If the “none” toggle is selected
-   the program will receive no feedback from the user on its actions until the “good” or “bad” toggle is selected.
+You can teach PendulumBot via the “good” and “bad” feedback buttons. Use the mouse to click on the button you would like to select. When a button is selected, it will have a darker color and glow. 
+When “good” feedback is provided, PendulumBot will become more likely to repeat its actions. When "bad" feedback is provided, PendulumBot will try not to repeat the same behavior.
+ The more you press either button the more feedback PendulumBot will recieve.
+   Feel free to provide as much feedback as you like.
     </p>
+    
     <p>
+<h4>Succesfuly completing the task.</h4>
+The goal of the task is to teach PendulumBot to balance and prevent it from falling. You can teach the PendelumBot by providing "good" and "bad" feedback. If you successfully teach the PendulumBot, PendulumBot will not 
+fall over and will continue to balance. Please continue to focus on the task for the remainder of the study. 
+    </p>
+    
+    <p>
+    
 
 <h4>Duration</h4>
-The interaction will last for approximately 15 minutes.
- After 15 minutes the external window will close and you will be prompted to complete the study.
+The interaction will last for approximately 15 minutes (at most 16 minutes).
+ After 15 minutes the pendulum window will close and you will be prompted to complete the study.
     </p>
 
 <form action="/info" method="post">

@@ -33,7 +33,6 @@ coil
 humor
 sugar
 boot
-language
 receipt
 work
 insurance
@@ -46,3 +45,9 @@ silver
 apple
 dog
 cat
+lamp
+cup
+mug
+freezer
+desk
+mailbox

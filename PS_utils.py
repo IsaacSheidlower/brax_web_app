@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from torch.distributions.normal import Normal
 
-def sample_normal(agent, actor, observation, with_noise=False, max_action=2, env_only=False):
+def sample_normal(agent, actor, observation, with_noise=False, max_action=2, env_only=False, kappa=.9):
     def get_dist(agent, actor, observation):
         observation = torch.Tensor(np.array(observation)).to('cpu')
         mu1, sigma1 = agent.actor.get_dist(observation)
@@ -17,8 +17,8 @@ def sample_normal(agent, actor, observation, with_noise=False, max_action=2, env
 
         kl = np.maximum(np.tanh(np.log(np.sqrt(sigma2)/np.sqrt(sigma2)) + (sigma2+(mu1-mu2)**2)/(2*sigma2) - .5),0)
         for i in range(len(kl)):
-            if kl[i] > .9:
-                kl[i] = .9
+            if kl[i] > kappa:
+                kl[i] = kappa
         
         mu = mu1*(kl) + mu2*(1-(kl))
         sigma = np.zeros(2) 

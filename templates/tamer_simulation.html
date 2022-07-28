@@ -64,7 +64,7 @@
     <script type=text/javascript>
             $(function() {
               $('a#good').bind('click', function() {
-                $.getJSON('/send_good_feedback/{{uuid}}',
+                $.getJSON('/tamer_send_good_feedback/{{uuid}}',
                     function(data) {
                   //do nothing
                 });
@@ -77,7 +77,7 @@
     <script type=text/javascript>
             $(function() {
               $('a#bad').bind('click', function() {
-                $.getJSON('/send_bad_feedback/{{uuid}}',
+                $.getJSON('/tamer_send_bad_feedback/{{uuid}}',
                     function(data) {
                   //do nothing
                 });

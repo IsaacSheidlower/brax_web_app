@@ -4,7 +4,7 @@ from typing import MutableMapping
 import cv2
 import csv
 
-from flask import Flask, request, render_template, Response, redirect, session,send_from_directory
+from flask import Flask, request, render_template, Response, redirect, session,send_from_directory, redirect
 from flask_wtf import FlaskForm
 from wtforms import SubmitField
 
@@ -23,7 +23,7 @@ from brax.io import image
 import jax
 from jax import numpy as jnp
 
-import time
+import time, copy
 
 from PIL import Image
 
@@ -102,7 +102,7 @@ def info():
 def index_uuid(uuid):
     if uuid in session:
         if session[uuid].get('agreed'):
-            feed_filename = f"feedback_data/participant_{uuid}.csv"
+            feed_filename = f"feedback_data/participant_feed_{uuid}.csv"
             with open(feed_filename, "x", newline='') as csvfile:
                 print("Done")
             learning_loop(uuid)
@@ -126,27 +126,27 @@ def finish(uuid):
 @app.route('/send_good_feedback/<uuid>')
 def send_good_feedback(uuid):
     #filename = "participant_data.csv"
-    with open(f"feedback_data/participant_{uuid}.csv", 'a', newline='') as csvfile:  
+    with open(f"feedback_data/participant_feed_{uuid}.csv", 'a', newline='') as csvfile:  
         csvwriter = csv.writer(csvfile)  
-        csvwriter.writerow(["1", time.time()*1000]) 
+        csvwriter.writerow(["1", time.time()]) 
         csvfile.close()
     return "nothing"
 
 @app.route('/send_bad_feedback/<uuid>')
 def send_bad_feedback(uuid):
     #filename = "participant_data.csv"
-    with open(f"feedback_data/participant_{uuid}.csv", 'a', newline='') as csvfile:  
+    with open(f"feedback_data/participant_feed_{uuid}.csv", 'a', newline='') as csvfile:  
         csvwriter = csv.writer(csvfile)  
-        csvwriter.writerow(["-1", time.time()*1000]) 
+        csvwriter.writerow(["-1", time.time()]) 
         csvfile.close()
     return "nothing"
 
 @app.route('/send_no_feedback/<uuid>')
 def send_no_feedback(uuid):
     #filename = "participant_data.csv"
-    with open(f"feedback_data/participant_{uuid}.csv", 'a', newline='') as csvfile:  
+    with open(f"feedback_data/participant_feed_{uuid}.csv", 'a', newline='') as csvfile:  
         csvwriter = csv.writer(csvfile)  
-        csvwriter.writerow(["0", time.time()*1000]) 
+        csvwriter.writerow(["0", time.time()]) 
         csvfile.close()
     return "nothing"
 
@@ -169,6 +169,8 @@ def render_browser(env_func):
                 return Response(frame_gen(env_func, *args, **kwargs), mimetype='multipart/x-mixed-replace; boundary=frame')
         return wrapper
 
+@app.route("/", methods=['GET', 'POST'])
+@app.route("/app/<uuid>", methods=['GET', 'POST'])
 @render_browser
 def learning_loop(uuid, end=False):
     with open(f"session_is_active.csv", mode='w', newline='') as csvfile:  
@@ -199,17 +201,23 @@ def learning_loop(uuid, end=False):
                 avg_loss = []
                 i = 0
                 for action_memory in self.queue: 
-                    b = tf-action_memory[2]
+                    b = tf - action_memory[2]
                     a = tf - action_memory[3]
+                    #print(b, a)
                     # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
                     #print(a, b)
                     pushed = (b >= interval_min and a <= interval_max)
+                    #print(tf)
                     # push: state, action, ts, te, tf, feedback
                     # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
                     if pushed:
+                        #print("AAAAAA")
                         agent.remember(action_memory[8], action_memory[1], feedback_value, action_memory[0], action_memory[9])
                     i += 1
                 return np.mean(np.array(avg_loss))
+            
+        def clear(self):
+            self.queue = []
 
     #env = gym.make('BipedalWalker-v3')
     
@@ -240,7 +248,7 @@ def learning_loop(uuid, end=False):
     # There is a frame time delay of .1 so teaching is not boring. Could make the 
     # the agent much better if played at around 10 frames per second (not sure of  current fps)
     interval_min = 0.1
-    interval_max = 0.8
+    interval_max = 2.0
 
     episodes=500
     USE_CUDA = torch.cuda.is_available()
@@ -280,7 +288,11 @@ def learning_loop(uuid, end=False):
     end_f=0
 
     action_queue = ActionQueue(queue_size)
-
+    
+    #kappa_possibilities = [0.7, 0.8, 0.9]
+    #kappa = kappa_possibilities[np.random.randint(low=0, high=3)]
+    kappa=0.8
+    
     rewards = []
     e = 0.0
     render = True
@@ -288,6 +300,7 @@ def learning_loop(uuid, end=False):
     timeout = time.time() + 60*15  # length of interaction
 
     true_done = False
+    tf = 0
     while time.time() < timeout and true_done == False:
         print(uuid)
         start_f=end_f
@@ -313,9 +326,8 @@ def learning_loop(uuid, end=False):
         # print(observation)
         ep_rewards = 0
         feedback_value = 0
-        tf = 0
-        tf_old = 0
-        time.sleep(.1)
+        #tf_old = 0
+        time.sleep(.3)
         while(True):
             #print(feedback_value)
             stopwatch.start()
@@ -329,7 +341,8 @@ def learning_loop(uuid, end=False):
 
             end_f+=1
             ts = stopwatch.duration
-            action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=1)
+            ts = time.time()
+            action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=1, kappa=kappa)
             #action, dist, mu, sigma = agent.sample_action(observation)
             #print(action)
             old_observation = observation
@@ -351,7 +364,7 @@ def learning_loop(uuid, end=False):
             #feedback_value = 0 # uncomment for sparse feedback
             time.sleep(e) # Delay to make the game seeable
             feedback = ""
-            all_feedback = np.genfromtxt(f"feedback_data/participant_{uuid}.csv", delimiter=',')
+            all_feedback = np.genfromtxt(f"feedback_data/participant_feed_{uuid}.csv", delimiter=',')
 
             if len(all_feedback) > 0:
                 if len(all_feedback) == 2 and np.size(all_feedback) == 2:
@@ -359,22 +372,26 @@ def learning_loop(uuid, end=False):
                 else:
                     latest_feedback = all_feedback[len(all_feedback)-1] 
                     feedback = latest_feedback[0]
-                    tf_old = tf 
+                    tf_old = copy.copy(tf) 
                     tf = latest_feedback[1]
                     if tf != tf_old:
                         if feedback == 1:
                             feedback_value = 1
+                            loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
                         elif feedback == -1:
                             feedback_value = -1
-                        else: 
-                            feedback_value = 0 
-                    
+                            loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
+                        #else: 
+                            #print("AAAAAA")
+                            #feedback_value = 0 
+                            #loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
+            #print(tf, ts, tf-ts)
             action_queue.enqeue([observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done])
 
             if feedback_value != 0:
                 #tf = stopwatch.duration
                 # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
-                loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value)
+                #loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
                 agent.remember(old_observation, action, feedback_value, observation, done)
                 #print(loss, "feedback loss")
 
@@ -387,7 +404,7 @@ def learning_loop(uuid, end=False):
             if done:
                 with open(rew_filename, 'a', newline='') as csvfile:  
                     csvwriter = csv.writer(csvfile)  
-                    csvwriter.writerow([episode_num, ep_rewards]) 
+                    csvwriter.writerow([episode_num, ep_rewards, end_f, time.time(), kappa]) 
                     csvfile.close()                                                         
                 print(ep_rewards)
                 print("Episode:", str(episode_num))
@@ -396,21 +413,22 @@ def learning_loop(uuid, end=False):
                 episode_rewards = []
                 episode_num += 1
                 feedback_value = 0
+                action_queue.clear()
 
-                if len(rewards) > 0:
-                    if rewards[len(rewards)-1] >= 400:
-                        true_done = True
+                #if len(rewards) > 0:
+                    #if rewards[len(rewards)-1] >= 400:
+                        #true_done = True
                 break
 
             active = np.genfromtxt("session_is_active.csv", delimiter=',')
-            if active == 0.0:
+            if time.time() > timeout and done:
                 true_done = True
                 break         
             
     finished = True
     #env.close()
     del env, agent, actor
-    img = Image.open("thankYou2.jpg")
+    img = Image.open("thankYou4.png")
     arr = np.array(img)
     yield arr
     with open(f"session_is_active.csv", mode='w', newline='') as csvfile:  
@@ -421,4 +439,4 @@ def learning_loop(uuid, end=False):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=2654)
+    app.run(host='0.0.0.0', port=2657)
