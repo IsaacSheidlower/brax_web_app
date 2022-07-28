@@ -1,3 +1,8 @@
+"""
+Author: Isaac Sheidlower, AABL Lab, Isaac.Sheidlower@tufts.edu
+Github: https://github.com/IsaacSheidlower
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

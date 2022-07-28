@@ -1,3 +1,8 @@
+"""
+Authored by AABL Lab
+Github: https://github.com/AABL-Lab
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

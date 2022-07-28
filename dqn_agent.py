@@ -1,3 +1,8 @@
+"""
+Authored by AABL Lab
+Github: https://github.com/AABL-Lab
+"""
+
 import numpy as np
 import random
 from collections import namedtuple, deque
