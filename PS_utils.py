@@ -18,7 +18,6 @@ def sample_normal(agent, actor, observation, with_noise=False, max_action=2, env
         sigma1 = sigma1.detach().numpy()
         mu2 = mu2.detach().numpy()
         sigma2 = sigma2.detach().numpy()
-        #mu = (mu1 + mu2)/2
 
         kl = np.maximum(np.tanh(np.log(np.sqrt(sigma2)/np.sqrt(sigma2)) + (sigma2+(mu1-mu2)**2)/(2*sigma2) - .5),0)
         for i in range(len(kl)):
@@ -27,14 +26,9 @@ def sample_normal(agent, actor, observation, with_noise=False, max_action=2, env
         
         mu = mu1*(kl) + mu2*(1-(kl))
         sigma = np.zeros(2) 
-        #sigma[0] = max(sigma1[0], sigma2[0]) 
-        #sigma[1] = max(sigma1[1], sigma2[1])
-        #sigma = (sigma1+sigma2)/2 
+
         sigma = sigma2
-        #mu[2] = 0
-        #mu[3] = 0
-        #sigma[2] = 0
-        #sigma[3] = 0
+
         mu = torch.from_numpy(mu)
         sigma = torch.from_numpy(sigma)
         #print(mu, sigma)
@@ -81,13 +75,9 @@ def sample_normal_multi(agent, actor, observation, with_noise=False, max_action=
         sigma2 = sigma2[0].detach().numpy()
         mu = (mu1 + mu2)/2
         sigma = np.zeros(2) 
-        #sigma[0] = min(sigma1[0], sigma2[0]) 
-        #sigma[1] = min(sigma1[1], sigma2[1])
+
         sigma = (sigma1+sigma2)/2 
-        #mu[2] = 0
-        #mu[3] = 0
-        #sigma[2] = 0
-        #sigma[3] = 0
+
         mu = torch.from_numpy(mu)
         sigma = torch.from_numpy(sigma)
         #print(mu, sigma)

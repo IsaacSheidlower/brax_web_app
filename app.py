@@ -56,11 +56,6 @@ if platform == "linux" or platform == "linux2":
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = os.path.join(DIR_PATH, 'templates/')
 
-#from pyvirtualdisplay import Display
-
-#virtual_display = Display(visible=0, size=(1400, 900))
-#virtual_display.start()
-
 
 global finished 
 finished = False
@@ -239,11 +234,7 @@ def cair_learning_loop(uuid, end=False):
                     # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
                     #print(a, b)
                     pushed = (b >= interval_min and a <= interval_max)
-                    #print(tf)
-                    # push: state, action, ts, te, tf, feedback
-                    # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
                     if pushed:
-                        #print("AAAAAA")
                         agent.remember(action_memory[8], action_memory[1], feedback_value, action_memory[0], action_memory[9])
                     i += 1
                 return np.mean(np.array(avg_loss))
@@ -251,24 +242,9 @@ def cair_learning_loop(uuid, end=False):
         def clear(self):
             self.queue = []
 
-    #env = gym.make('BipedalWalker-v3')
-    
-    #env = gym.make('LunarLanderContinuous-v2')
-    #env.viewer = None
-
     environment = "inverted_pendulum"  # @param ['ant', 'halfcheetah', 'hopper', 'humanoid', 'reacher', 'walker2d', 'fetch', 'grasp', 'ur5e']
     env = envs.create(env_name=environment)
     state = env.reset(rng=jp.random_prngkey(seed=0))
-    #state = jax.jit(env.step)(state, jnp.ones((env.action_size,)))
-    #env = wrappers.Monitor(env, "media", video_callable=False, force=True)
-    
-    # entry_point = functools.partial(envs.create_gym_env, env_name='reacher')
-    # if 'brax-reacher-v0' not in gym.envs.registry.env_specs:
-    #     gym.register('brax-reacher-v0', entry_point=entry_point)
-
-    # env = gym.make("brax-reacher-v0", batch_size=1)
-
-    # env = to_torch.JaxToTorchWrapper(env, device='cpu')
 
 
     rew_filename = f"reward_data/participant_{uuid}.csv"
@@ -358,11 +334,6 @@ def cair_learning_loop(uuid, end=False):
         done = state.done
         yield image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
 
-        #yield scene
-        #time.sleep(3)
-        # observation = env.reset()
-        # observation = observation.numpy()[0]
-        # print(observation)
         ep_rewards = 0
         feedback_value = 0
         #tf_old = 0
@@ -370,25 +341,12 @@ def cair_learning_loop(uuid, end=False):
         while(True):
             #print(feedback_value)
             stopwatch.start()
-            #scene = env.render(mode='rgb_array')
-            #yield scene
-            #action = jp.ones((env.action_size,)) * jp.sin(end_f * jp.pi / 15)
-            #state = jax.jit(env.step)(state, action)
-            #state = env.step(state, action)
-            #state = jax.jit(env.step)(state, action)
-            #yield image.render_array(env.sys, state.qp, width=400, height=400)
-
             end_f+=1
             ts = stopwatch.duration
             ts = time.time()
             action, dist, mu, sigma = sample_normal(agent, actor, observation, with_noise=False, max_action=1, kappa=kappa)
-            #action, dist, mu, sigma = agent.sample_action(observation)
-            #print(action)
-            old_observation = observation
 
-            #observation, reward, done, _ = env.step(torch.tensor(np.array(action[None,:])))
-            #observation = observation.numpy()[0]
-            #state = env.step(state, action)
+            old_observation = observation
             state = jax.jit(env.step)(state, action)
             
             scene_img =  image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
@@ -397,7 +355,6 @@ def cair_learning_loop(uuid, end=False):
             observation = [np_state[0], np_state[1], np_state[5], np_state[6], np_state[9]]
             reward = state.reward
             done = state.done
-            #print("AAAA")
             
             actor.remember(old_observation, action, reward, observation, done)
             episode_rewards.append(reward)
@@ -431,19 +388,11 @@ def cair_learning_loop(uuid, end=False):
                                 csvwriter = csv.writer(csvfile)  
                                 csvwriter.writerow([observation, tf]) 
                                 csvfile.close()    
-                        #else: 
-                            # DOUBLE CHECK
-                            #feedback_value = 0 
-                            #loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
-            #print(tf, ts, tf-ts)
+
             action_queue.enqeue([observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done])
 
             if feedback_value != 0:
-                #tf = stopwatch.duration
-                # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
                 loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
-                #agent.remember(old_observation, action, feedback_value, observation, done)
-                #print(loss, "feedback loss")
 
             actor.learn()
             agent.learn()
@@ -458,19 +407,13 @@ def cair_learning_loop(uuid, end=False):
                     csvwriter = csv.writer(csvfile)  
                     csvwriter.writerow([episode_num, ep_rewards, end_f, time.time(), kappa]) 
                     csvfile.close()                                                         
-                #print(ep_rewards)
-                #print("Episode:", str(episode_num))
+
                 rewards.append(ep_rewards)
                 ep_rewards = 0
                 episode_rewards = []
                 episode_num += 1
                 feedback_value = 0
                 action_queue.clear()
-                #yield image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
-
-                #if len(rewards) > 0:
-                    #if rewards[len(rewards)-1] >= 400:
-                        #true_done = True
                 break
 
             if time.time() > timeout and done:
@@ -521,11 +464,7 @@ def tamer_learning_loop(uuid, end=False):
                     # feedback must occur within 0.2-4 seconds after feedback to have non-zero importance weight
                     #print(a, b)
                     pushed = (b >= interval_min and a <= interval_max)
-                    #print(tf)
-                    # push: state, action, ts, te, tf, feedback
-                    # [observation, action, ts, te, tf, feedback_value, old_observation, done]
                     if pushed:
-                        #print("AAAAA")
                         agent.remember(action_memory[6], action_memory[1], feedback_value, action_memory[0], action_memory[7])
                     i += 1
                 return np.mean(np.array(avg_loss))
@@ -533,24 +472,9 @@ def tamer_learning_loop(uuid, end=False):
         def clear(self):
             self.queue = []
 
-    #env = gym.make('BipedalWalker-v3')
-    
-    #env = gym.make('LunarLanderContinuous-v2')
-    #env.viewer = None
-
     environment = "inverted_pendulum"  # @param ['ant', 'halfcheetah', 'hopper', 'humanoid', 'reacher', 'walker2d', 'fetch', 'grasp', 'ur5e']
     env = envs.create(env_name=environment)
     state = env.reset(rng=jp.random_prngkey(seed=0))
-    #state = jax.jit(env.step)(state, jnp.ones((env.action_size,)))
-    #env = wrappers.Monitor(env, "media", video_callable=False, force=True)
-    
-    # entry_point = functools.partial(envs.create_gym_env, env_name='reacher')
-    # if 'brax-reacher-v0' not in gym.envs.registry.env_specs:
-    #     gym.register('brax-reacher-v0', entry_point=entry_point)
-
-    # env = gym.make("brax-reacher-v0", batch_size=1)
-
-    # env = to_torch.JaxToTorchWrapper(env, device='cpu')
 
 
     rew_filename = f"tamer_reward_data/participant_{uuid}.csv"
@@ -607,13 +531,9 @@ def tamer_learning_loop(uuid, end=False):
         stopwatch.restart()
         loss = 0
 
-        #state = env.reset(rng=jp.random_prngkey(seed=0))
         
         action = jp.zeros((env.action_size,))
-        #state = jax.jit(env.step)(state, action)
-        #state = env.step(state, action)
         state = jax.jit(env.step)(state, action)
-        #yield image.render_array(env.sys, state.qp, width=500, height=500)
         np_state = np.array(state.obs)
         observation = np.array([np_state[0], np_state[1], np_state[5], np_state[6], np_state[9]])
         reward = state.reward
@@ -644,18 +564,13 @@ def tamer_learning_loop(uuid, end=False):
                 action = np.array([.1])
             else:
                 action = np.array([-.1])
-
             #print(action_indicator)
 
-            #print(eps, eps_decay, min_eps)
             eps = max(eps*eps_decay, min_eps)
 
             
             old_observation = observation
 
-            #observation, reward, done, _ = env.step(torch.tensor(np.array(action[None,:])))
-            #observation = observation.numpy()[0]
-            #state = env.step(state, action)
             state = jax.jit(env.step)(state, action)
             yield image.render_array(env.sys, state.qp, width=500, height=500, ssaa=1)
             np_state = np.array(state.obs)
@@ -695,10 +610,7 @@ def tamer_learning_loop(uuid, end=False):
                                 csvwriter = csv.writer(csvfile)  
                                 csvwriter.writerow([observation, tf]) 
                                 csvfile.close()    
-                        #else: 
-                            #feedback_value = 0 
-                            #loss = action_queue.push_to_buffer(agent, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
-            #print(tf, ts, tf-ts)
+
             action_queue.enqeue([observation, action, ts, te, tf, feedback_value, old_observation, done])
             
             if feedback_value != 0:
@@ -707,12 +619,6 @@ def tamer_learning_loop(uuid, end=False):
                 agent.step_without_storage()
 
             feedback_value=0
-            # if feedback_value != 0:
-            #     #tf = stopwatch.duration
-            #     # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
-            #     #loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
-            #     agent.remember(old_observation, action, feedback_value, observation, done)
-            #     #print(loss, "feedback loss")
 
 
             if stopwatch.duration > 60:
@@ -730,11 +636,6 @@ def tamer_learning_loop(uuid, end=False):
                 episode_rewards = []
                 episode_num += 1
                 feedback_value = 0
-                #action_queue.clear()
-
-                #if len(rewards) > 0:
-                    #if rewards[len(rewards)-1] >= 400:
-                        #true_done = True
                 break
 
             if time.time() > timeout and done:

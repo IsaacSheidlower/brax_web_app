@@ -264,7 +264,6 @@ def learning_loop(uuid, end=False):
     print_interval = 1000
     log_interval = 1000
     learning_start = 100
-    #win_reward = 21     # Pong-v4
     win_break = True
     queue_size = 1000
 
@@ -360,7 +359,6 @@ def learning_loop(uuid, end=False):
             observation = state.obs
             reward = state.reward
             done = state.done
-            #print("AAAA")
             
             actor.remember(old_observation, action, reward, observation, done)
             episode_rewards.append(reward)
@@ -386,19 +384,10 @@ def learning_loop(uuid, end=False):
                         elif feedback == -1:
                             feedback_value = -1
                             loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
-                        #else: 
-                            #print("AAAAAA")
-                            #feedback_value = 0 
-                            #loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
-            #print(tf, ts, tf-ts)
             action_queue.enqeue([observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done])
 
             if feedback_value != 0:
-                #tf = stopwatch.duration
-                # [observation, action, ts, te, tf, feedback_value, mu, sigma, old_observation, done]
-                #loss = action_queue.push_to_buffer_and_learn(agent, actor, tf, feedback_value, interval_min=interval_min, interval_max=interval_max)
                 agent.remember(old_observation, action, feedback_value, observation, done)
-                #print(loss, "feedback loss")
 
             actor.learn()
             agent.learn()
@@ -419,10 +408,6 @@ def learning_loop(uuid, end=False):
                 episode_num += 1
                 feedback_value = 0
                 action_queue.clear()
-
-                #if len(rewards) > 0:
-                    #if rewards[len(rewards)-1] >= 400:
-                        #true_done = True
                 break
 
             active = np.genfromtxt("session_is_active.csv", delimiter=',')
